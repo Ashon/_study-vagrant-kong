@@ -1,0 +1,50 @@
+- name: 도커 구동 환경을 준비합니다.
+  become: yes
+  hosts:
+    - all
+  tasks:
+    - name: 구성에 필요한 패키지를 설치합니다.
+      apt:
+        name: "{{ item }}"
+        update_cache: yes
+      with_items:
+        - apt-transport-https
+        - ca-certificates
+        - curl
+        - software-properties-common
+        - python-pip
+
+    - name: docker 커맨드가 있는지 확인
+      command: docker
+      ignore_errors: yes
+      register: docker_exists
+
+    - name: docker-gpg키 다운로드
+      get_url:
+        url: https://download.docker.com/linux/ubuntu/gpg
+        dest: /tmp/docker-gpg
+      when: docker_exists | failed
+
+    - name: OS 릴리즈 확인
+      command: lsb_release -cs
+      register: release
+      when: docker_exists | failed
+
+    - name: docker-ce 패키지 리파지토리 세팅
+      command: "{{ item }}"
+      items:
+        - apt-key add /tmp/docker-gpg
+        - apt-key fingerprint 0EBFCD88
+        - add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu {{ release.stdout }} stable"
+      when: docker_exists | failed
+
+    - name: docker-ce 패키지를 설치합니다.
+      apt:
+        name: docker-ce
+        update_cache: yes
+      when: docker_exists | failed
+
+    - name: docker-py 파이썬 패키지를 설치합니다.
+      pip:
+        name: docker-py
+
